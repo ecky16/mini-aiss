@@ -96,6 +96,12 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
   const handleUploadEvidence = async (boqIndex: number, files: any[]) => {
     const existing = submissions.find(s => s.boqIndex === boqIndex);
     const id = existing ? existing.id : crypto.randomUUID();
+    
+    // Delete old files from Supabase Storage if overwriting
+    if (existing && existing.files && existing.files.length > 0) {
+      await deleteFilesFromSupabase(existing.files.map((f: any) => f.url));
+    }
+
     const subData = {
       lopId,
       companyId: lop?.companyId || '',
@@ -119,6 +125,12 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
   const handleUploadMandatory = async (type: string, files: any[]) => {
     const existing = mandatoryUploads.find(m => m.type === type);
     const id = existing ? existing.id : crypto.randomUUID();
+    
+    // Delete old files from Supabase Storage if overwriting
+    if (existing && existing.files && existing.files.length > 0) {
+      await deleteFilesFromSupabase(existing.files.map((f: any) => f.url));
+    }
+
     const mandData = {
       lopId,
       companyId: lop?.companyId || '',
@@ -462,20 +474,15 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
                     )}
                     {profile.role === 'mitra' ? (
                       upload.status !== 'approved' && (
-                        <button 
-                          onClick={async () => {
-                            if (confirm('Apakah Anda yakin ingin menghapus file ini dan mengunggah ulang?')) {
-                              if (upload.files && upload.files.length > 0) {
-                                await deleteFilesFromSupabase(upload.files.map(f => f.url));
-                              }
-                              await supabase?.from('mandatory_uploads').delete().eq('id', upload.id);
-                              await fetchData();
-                            }
-                          }}
-                          className="text-xs text-red-500 hover:underline flex items-center gap-1"
-                        >
-                          <Trash2 className="w-3 h-3" /> Remove & Re-upload
-                        </button>
+                        <div className="pt-2 border-t border-slate-100">
+                          <p className="text-[10px] text-slate-400 mb-1">Upload ulang untuk mengganti file:</p>
+                          <FileUploader 
+                            onUploadComplete={(files) => handleUploadMandatory(type.name, files)}
+                            maxSizeMB={10}
+                            multiple={true}
+                            telegramCaption={`Mandatory Re-upload: ${type.name}\nLOP: ${lop.name}\nMitra: ${profile.name}`}
+                          />
+                        </div>
                       )
                     ) : (
                       upload.status === 'pending' && (
@@ -557,30 +564,12 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
                       {profile.role === 'mitra' ? (
                         (!sub || sub.status === 'rejected') ? (
                           <div className="flex flex-col items-end gap-2">
-                            {sub?.status === 'rejected' && (
-                              <button
-                                onClick={async () => {
-                                  if (confirm('Apakah Anda yakin ingin menghapus file ini dan mengunggah ulang?')) {
-                                    if (sub.files && sub.files.length > 0) {
-                                      await deleteFilesFromSupabase(sub.files.map(f => f.url));
-                                    }
-                                    await supabase?.from('submissions').delete().eq('id', sub.id);
-                                    await fetchData();
-                                  }
-                                }}
-                                className="text-xs text-red-500 hover:underline flex items-center gap-1"
-                              >
-                                <Trash2 className="w-3 h-3" /> Remove & Re-upload
-                              </button>
-                            )}
-                            {!sub && (
-                              <button 
-                                onClick={() => setReviewing({ index: i, type: 'boq' })}
-                                className="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center gap-1 ml-auto"
-                              >
-                                <Upload className="w-4 h-4" /> Upload
-                              </button>
-                            )}
+                            <button 
+                              onClick={() => setReviewing({ index: i, type: 'boq' })}
+                              className="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center gap-1 ml-auto"
+                            >
+                              <Upload className="w-4 h-4" /> {sub ? 'Re-upload' : 'Upload'}
+                            </button>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">Submitted</span>
