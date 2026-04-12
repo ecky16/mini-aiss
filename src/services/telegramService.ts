@@ -5,6 +5,13 @@
 const BOT_TOKEN = import.meta.env.TELEGRAM_BOT_TOKEN || import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
 const CHAT_ID = import.meta.env.TELEGRAM_CHAT_ID || import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
+// Debug logging to check if env vars are loaded
+console.log("Telegram Config Loaded:", { 
+  hasToken: !!BOT_TOKEN, 
+  hasChatId: !!CHAT_ID,
+  chatId: CHAT_ID // Safe to log chat ID
+});
+
 export async function sendTelegramMessage(message: string) {
   if (!BOT_TOKEN || !CHAT_ID) {
     console.error("TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID belum diatur.");
