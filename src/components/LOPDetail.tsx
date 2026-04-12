@@ -149,12 +149,6 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
             updatedAt: new Date().toISOString()
           };
           await syncSubmissionToSupabase(sub.id, updatedSub);
-
-          // Send Telegram Notification
-          if (lop) {
-            const designator = lop.boq[reviewing.index].designator;
-            await sendTelegramMessage(formatQCNotification(lop.name, designator, status, status === 'rejected' ? rejectReason : undefined));
-          }
         }
       } else if (reviewing.type === 'mandatory') {
         const mand = mandatoryUploads.find(m => m.type === reviewing.mandatoryType);
@@ -168,11 +162,6 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
             updatedAt: new Date().toISOString()
           };
           await syncMandatoryUploadToSupabase(mand.id, updatedMand);
-
-          // Send Telegram Notification
-          if (lop) {
-            await sendTelegramMessage(formatQCNotification(lop.name, `Mandatory: ${mand.type}`, status, status === 'rejected' ? rejectReason : undefined));
-          }
         }
       }
       await fetchData();
@@ -311,27 +300,80 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
         </div>
 
         <div className="flex gap-2">
-          {profile.role === 'admin' && (allApproved && mandatoryDone) && (
+          {profile.role === 'admin' && (
             <>
-              {lop.status !== 'completed' ? (
-                <button
-                  onClick={handleCompleteAndArchive}
-                  disabled={exporting}
-                  className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md shadow-green-100"
-                >
-                  {exporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
-                  <span className="hidden sm:inline">Selesai & Arsipkan</span>
-                </button>
+              {(allApproved && mandatoryDone) ? (
+                <>
+                  {lop.status !== 'completed' ? (
+                    <button
+                      onClick={handleCompleteAndArchive}
+                      disabled={exporting}
+                      className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md shadow-green-100"
+                    >
+                      {exporting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle className="w-5 h-5" />}
+                      <span className="hidden sm:inline">Selesai & Arsipkan</span>
+                    </button>
+                  ) : (
+                    <a
+                      href="https://web.telegram.org"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md"
+                    >
+                      <MessageSquare className="w-5 h-5" />
+                      <span className="hidden sm:inline">Cek Arsip di Telegram</span>
+                    </a>
+                  )}
+                </>
               ) : (
-                <a
-                  href="https://web.telegram.org"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md"
+                <button
+                  onClick={async () => {
+                    if (!supabase || !lop) return;
+                    
+                    // Generate Summary
+                    let summary = `📋 <b>HASIL REVIEW LOP</b>\n\n`;
+                    summary += `<b>LOP:</b> ${lop.name}\n`;
+                    summary += `<b>Mitra:</b> ${lop.companyName}\n\n`;
+                    
+                    const approved: string[] = [];
+                    const rejected: {name: string, reason: string}[] = [];
+                    
+                    submissions.forEach(sub => {
+                      const name = lop.boq[sub.boqIndex].designator;
+                      if (sub.status === 'approved') approved.push(name);
+                      if (sub.status === 'rejected') rejected.push({name, reason: sub.rejectReason || ''});
+                    });
+                    
+                    mandatoryUploads.forEach(mand => {
+                      if (mand.status === 'approved') approved.push(`Mandatory: ${mand.type}`);
+                      if (mand.status === 'rejected') rejected.push({name: `Mandatory: ${mand.type}`, reason: mand.rejectReason || ''});
+                    });
+                    
+                    if (approved.length > 0) {
+                      summary += `✅ <b>APPROVED:</b>\n`;
+                      approved.forEach(item => summary += `- ${item}\n`);
+                      summary += `\n`;
+                    }
+                    
+                    if (rejected.length > 0) {
+                      summary += `❌ <b>REJECTED (Perlu Perbaikan):</b>\n`;
+                      rejected.forEach(item => summary += `- ${item.name}\n  <i>Alasan: ${item.reason}</i>\n`);
+                    } else if (approved.length === 0) {
+                      summary += `<i>Belum ada dokumen yang di-review.</i>`;
+                    }
+                    
+                    try {
+                      await sendTelegramMessage(summary);
+                      alert("Hasil review berhasil dikirim ke Telegram!");
+                    } catch (err) {
+                      alert("Gagal mengirim hasil review ke Telegram.");
+                    }
+                  }}
+                  className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md"
                 >
                   <MessageSquare className="w-5 h-5" />
-                  <span className="hidden sm:inline">Cek Arsip di Telegram</span>
-                </a>
+                  <span className="hidden sm:inline">Kirim Hasil Review</span>
+                </button>
               )}
             </>
           )}
@@ -421,7 +463,15 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
                     {profile.role === 'mitra' ? (
                       upload.status !== 'approved' && (
                         <button 
-                          onClick={() => handleUploadMandatory(type.name, [])}
+                          onClick={async () => {
+                            if (confirm('Apakah Anda yakin ingin menghapus file ini dan mengunggah ulang?')) {
+                              if (upload.files && upload.files.length > 0) {
+                                await deleteFilesFromSupabase(upload.files.map(f => f.url));
+                              }
+                              await supabase?.from('mandatory_uploads').delete().eq('id', upload.id);
+                              await fetchData();
+                            }
+                          }}
                           className="text-xs text-red-500 hover:underline flex items-center gap-1"
                         >
                           <Trash2 className="w-3 h-3" /> Remove & Re-upload
@@ -506,12 +556,32 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
                     <td className="px-6 py-4 text-right">
                       {profile.role === 'mitra' ? (
                         (!sub || sub.status === 'rejected') ? (
-                          <button 
-                            onClick={() => setReviewing({ index: i, type: 'boq' })}
-                            className="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center gap-1 ml-auto"
-                          >
-                            <Upload className="w-4 h-4" /> Upload
-                          </button>
+                          <div className="flex flex-col items-end gap-2">
+                            {sub?.status === 'rejected' && (
+                              <button
+                                onClick={async () => {
+                                  if (confirm('Apakah Anda yakin ingin menghapus file ini dan mengunggah ulang?')) {
+                                    if (sub.files && sub.files.length > 0) {
+                                      await deleteFilesFromSupabase(sub.files.map(f => f.url));
+                                    }
+                                    await supabase?.from('submissions').delete().eq('id', sub.id);
+                                    await fetchData();
+                                  }
+                                }}
+                                className="text-xs text-red-500 hover:underline flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3" /> Remove & Re-upload
+                              </button>
+                            )}
+                            {!sub && (
+                              <button 
+                                onClick={() => setReviewing({ index: i, type: 'boq' })}
+                                className="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center gap-1 ml-auto"
+                              >
+                                <Upload className="w-4 h-4" /> Upload
+                              </button>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">Submitted</span>
                         )
