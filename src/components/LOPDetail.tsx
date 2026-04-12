@@ -238,6 +238,7 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
 
       // 2. Send to Telegram
       let telegramSuccess = false;
+      let telegramErrorMsg = '';
       try {
         const zipFile = new File([content], `${lop.name}.zip`, { type: 'application/zip' });
         if (zipFile.size > 50 * 1024 * 1024) {
@@ -245,8 +246,9 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
         }
         await sendTelegramFile(zipFile, `📦 ARSIP LOP SELESAI\n\nLOP: ${lop.name}\nPT: ${lop.companyName}\n\nSemua file telah di-approve dan diarsipkan.`);
         telegramSuccess = true;
-      } catch (tgError) {
+      } catch (tgError: any) {
         console.error("Failed to send ZIP to Telegram:", tgError);
+        telegramErrorMsg = tgError.message || 'Unknown error';
       }
 
       // 3. Delete from Supabase Storage
@@ -267,7 +269,7 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
       if (telegramSuccess) {
         alert("✅ BERHASIL!\n\n1. File ZIP berhasil didownload ke komputer Anda.\n2. File ZIP berhasil dikirim ke Channel Telegram.\n3. File fisik di Supabase berhasil dihapus untuk menghemat storage.");
       } else {
-        alert("⚠️ SEBAGIAN BERHASIL!\n\n1. File ZIP berhasil didownload.\n2. File fisik di Supabase berhasil dihapus.\n\n❌ GAGAL mengirim ke Telegram (Mungkin ukuran file > 50MB).");
+        alert(`⚠️ SEBAGIAN BERHASIL!\n\n1. File ZIP berhasil didownload.\n2. File fisik di Supabase berhasil dihapus.\n\n❌ GAGAL mengirim ke Telegram:\n${telegramErrorMsg}`);
       }
       onBack();
     } catch (err) {

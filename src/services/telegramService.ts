@@ -6,20 +6,27 @@ const BOT_TOKEN = import.meta.env.TELEGRAM_BOT_TOKEN || import.meta.env.VITE_TEL
 const CHAT_ID = import.meta.env.TELEGRAM_CHAT_ID || import.meta.env.VITE_TELEGRAM_CHAT_ID;
 
 export async function sendTelegramMessage(message: string) {
-  if (!BOT_TOKEN || !CHAT_ID) return;
+  if (!BOT_TOKEN || !CHAT_ID) {
+    console.error("TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID belum diatur.");
+    return;
+  }
   const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
   
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
   try {
-    await fetch(url, {
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ chat_id: CHAT_ID, text: message, parse_mode: 'HTML' }),
       signal: controller.signal
     });
     clearTimeout(timeoutId);
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Telegram Message Error:', errorData);
+    }
   } catch (error) {
     console.error('Failed to send Telegram message:', error);
   }
@@ -72,7 +79,9 @@ export async function sendTelegramMediaGroup(files: File[], caption: string) {
 }
 
 export async function sendTelegramFile(file: File, caption: string) {
-  if (!BOT_TOKEN || !CHAT_ID) return null;
+  if (!BOT_TOKEN || !CHAT_ID) {
+    throw new Error("TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID belum diatur di Environment Variables Vercel.");
+  }
 
   const isImage = file.type.startsWith('image/');
   const method = isImage ? 'sendPhoto' : 'sendDocument';
@@ -102,11 +111,11 @@ export async function sendTelegramFile(file: File, caption: string) {
     } else {
       const errorData = await response.json();
       console.error('Telegram File Upload Error:', errorData);
-      return null;
+      throw new Error(`Telegram API Error: ${errorData.description || 'Unknown error'}`);
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to send file to Telegram:', error);
-    return null;
+    throw error;
   }
 }
 
