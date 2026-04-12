@@ -102,11 +102,13 @@ export default function UserManagement({ currentUserProfile }: { currentUserProf
   };
 
   const [confirming, setConfirming] = useState<{
-    type: 'delete' | 'role',
+    type: 'delete' | 'role' | 'password',
     user?: UserProfile,
     action: () => Promise<void>
   } | null>(null);
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [editPasswordUser, setEditPasswordUser] = useState<UserProfile | null>(null);
+  const [editPasswordValue, setEditPasswordValue] = useState('');
 
   useEffect(() => {
     if (notification) {
@@ -115,13 +117,40 @@ export default function UserManagement({ currentUserProfile }: { currentUserProf
     }
   }, [notification]);
 
+  const handleChangePassword = async (user: UserProfile) => {
+    if (!editPasswordValue) return;
+    
+    setConfirming({
+      type: 'password',
+      user,
+      action: async () => {
+        try {
+          if (!supabase) return;
+          await supabase.from('users').update({ password: editPasswordValue }).eq('uid', user.uid);
+          
+          if (user.uid === currentUserProfile.uid) {
+            const updatedProfile = { ...currentUserProfile, password: editPasswordValue };
+            localStorage.setItem('mini_aiss_session', JSON.stringify(updatedProfile));
+          }
+          
+          setNotification({ message: `Password ${user.name} berhasil diubah`, type: 'success' });
+          setEditPasswordUser(null);
+          setEditPasswordValue('');
+          await fetchData();
+        } catch (error: any) {
+          setNotification({ message: error.message, type: 'error' });
+        }
+      }
+    });
+  };
+
 
 
 
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newRole === 'admin' && !newEmail) return;
+    if (newRole === 'admin' && (!newEmail || !newPassword)) return;
     if (newRole === 'mitra' && (!newUsername || !newPassword)) return;
     if (!newName) return;
     
@@ -148,7 +177,7 @@ export default function UserManagement({ currentUserProfile }: { currentUserProf
         uid: crypto.randomUUID(),
         email: newRole === 'admin' ? newEmail.toLowerCase() : '',
         username: newRole === 'mitra' ? newUsername : '',
-        password: newRole === 'mitra' ? newPassword : '',
+        password: newPassword, // Save password for both roles
         name: newName,
         role: newRole,
         companyId: newRole === 'mitra' ? (newCompanyId || '') : '',
@@ -268,6 +297,8 @@ export default function UserManagement({ currentUserProfile }: { currentUserProf
                   ? `Apakah Anda yakin ingin menghapus user ${confirming.user?.name}?`
                   : confirming.type === 'role'
                   ? `Apakah Anda yakin ingin mengubah role ${confirming.user?.name} menjadi ${confirming.user?.role === 'admin' ? 'Mitra' : 'Admin'}?`
+                  : confirming.type === 'password'
+                  ? `Apakah Anda yakin ingin mengubah password untuk user ${confirming.user?.name}?`
                   : 'Apakah Anda yakin ingin melakukan sinkronisasi ulang semua data ke Supabase? Ini akan menimpa data yang ada di Supabase.'
                 }
               </p>
@@ -417,14 +448,24 @@ export default function UserManagement({ currentUserProfile }: { currentUserProf
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {newRole === 'admin' ? (
-                  <input
-                    type="email"
-                    placeholder="Email (Wajib Google Account)"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    required
-                  />
+                  <>
+                    <input
+                      type="email"
+                      placeholder="Email Admin"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      className="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                    <input
+                      type="text"
+                      placeholder="Password Admin"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      required
+                    />
+                  </>
                 ) : (
                   <>
                     <input
@@ -506,27 +547,60 @@ export default function UserManagement({ currentUserProfile }: { currentUserProf
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => handleDeleteUser(user)}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                  title="Hapus User"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-                <span className={cn(
-                  "text-xs font-bold px-2 py-1 rounded-full uppercase",
-                  user.role === 'admin' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
-                )}>
-                  {user.role}
-                </span>
-                
-                <button
-                  onClick={() => toggleRole(user)}
-                  className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-all border border-blue-200"
-                >
-                  Ubah ke {user.role === 'admin' ? 'Mitra' : 'Admin'}
-                </button>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-4 sm:mt-0">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleDeleteUser(user)}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    title="Hapus User"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                  <span className={cn(
+                    "text-xs font-bold px-2 py-1 rounded-full uppercase",
+                    user.role === 'admin' ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"
+                  )}>
+                    {user.role}
+                  </span>
+                  
+                  <button
+                    onClick={() => toggleRole(user)}
+                    className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-2 rounded-lg transition-all border border-blue-200"
+                  >
+                    Ubah ke {user.role === 'admin' ? 'Mitra' : 'Admin'}
+                  </button>
+                </div>
+
+                {editPasswordUser?.uid === user.uid ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      placeholder="Password Baru"
+                      value={editPasswordValue}
+                      onChange={(e) => setEditPasswordValue(e.target.value)}
+                      className="px-2 py-1 text-sm border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 w-32"
+                    />
+                    <button
+                      onClick={() => handleChangePassword(user)}
+                      className="text-xs font-bold text-white bg-green-600 hover:bg-green-700 px-2 py-1 rounded transition-all"
+                    >
+                      Simpan
+                    </button>
+                    <button
+                      onClick={() => { setEditPasswordUser(null); setEditPasswordValue(''); }}
+                      className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded transition-all"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => { setEditPasswordUser(user); setEditPasswordValue(''); }}
+                    className="text-xs font-bold text-slate-600 hover:bg-slate-100 px-3 py-2 rounded-lg transition-all border border-slate-200"
+                  >
+                    Ubah Password
+                  </button>
+                )}
               </div>
             </motion.div>
           ))}
