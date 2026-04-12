@@ -1,0 +1,99 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Application user with roles",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "mitra"] },
+        "name": { "type": "string" },
+        "companyId": { "type": "string" },
+        "companyName": { "type": "string" }
+      },
+      "required": ["uid", "role"]
+    },
+    "Company": {
+      "title": "Company",
+      "description": "Mitra Company (PT)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "LOP": {
+      "title": "LOP",
+      "description": "Job/Project definition",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "LOP Name (Mandatory)" },
+        "type": { "type": "string", "enum": ["QE QORRECTIVE", "QE PREVENTIVE"] },
+        "companyId": { "type": "string" },
+        "companyName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] },
+        "boq": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "designator": { "type": "string" },
+              "description": { "type": "string" },
+              "qty": { "type": "number" }
+            }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "type", "mitraId", "status"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Evidence submission for a BOQ item",
+      "type": "object",
+      "properties": {
+        "lopId": { "type": "string" },
+        "boqIndex": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "size": { "type": "number" },
+              "type": { "type": "string" }
+            }
+          }
+        },
+        "rejectReason": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["lopId", "boqIndex", "status"]
+    },
+    "MandatoryUpload": {
+      "title": "MandatoryUpload",
+      "description": "Mandatory files for an LOP",
+      "type": "object",
+      "properties": {
+        "lopId": { "type": "string" },
+        "type": { "type": "string", "enum": ["ABD SW", "EVIDENCE pra material", "Hasil Ukur", "BA Pendukung"] },
+        "files": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["lopId", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "User profiles" },
+    "/companies/{companyId}": { "schema": "Company", "description": "Mitra companies" },
+    "/lops/{lopId}": { "schema": "LOP", "description": "Job projects" },
+    "/submissions/{submissionId}": { "schema": "Submission", "description": "BOQ item evidence" },
+    "/mandatoryUploads/{uploadId}": { "schema": "MandatoryUpload", "description": "Mandatory/Optional LOP files" }
+  }
+}

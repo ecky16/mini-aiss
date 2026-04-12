@@ -1,0 +1,98 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Fields: uid, email, role, name
+//
+// Collection: lops
+// Fields: name, type, mitraId, mitraName, status, boq, createdAt
+//
+// Collection: submissions
+// Fields: lopId, boqIndex, status, files, rejectReason, updatedAt
+//
+// Collection: mandatoryUploads
+// Fields: lopId, type, files, updatedAt
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email == "eckyrahmad769@gmail.com" && request.auth.token.email_verified == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isMitra() {
+      return isAuthenticated() && 
+             exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'mitra';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidUser(data, uid) {
+      return data.keys().hasAll(['uid', 'role', 'name']) &&
+             data.uid == uid &&
+             data.role in ['admin', 'mitra'] &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             (data.role == 'admin' ? (data.email is string && data.email.size() > 0) : true) &&
+             (data.role == 'mitra' ? (
+               data.username is string && data.username.size() > 0 &&
+               data.password is string && data.password.size() > 0
+             ) : true);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{uid} {
+      allow read: if true; // Temporary for debugging login issues
+      allow create: if true; // Temporary for debugging login issues
+      allow update: if true; // Temporary for debugging login issues
+      allow delete: if isAdmin();
+    }
+
+    match /companies/{companyId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /lops/{lopId} {
+      allow read: if true;
+      allow write: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /submissions/{submissionId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+    }
+
+    match /mandatoryUploads/{uploadId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+    }
+  }
+}
