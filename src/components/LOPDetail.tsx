@@ -202,9 +202,18 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
           
           for (const file of sub.files) {
             allUrls.push(file.url);
-            const response = await fetch(file.url);
-            const blob = await response.blob();
-            boqFolder?.file(file.name, blob);
+            try {
+              const filePath = file.url.split('/evidence/')[1];
+              if (!filePath) throw new Error("Invalid URL path");
+              const { data, error } = await supabase.storage.from('evidence').download(filePath);
+              if (error) throw error;
+              if (data) boqFolder?.file(file.name, data);
+            } catch (err) {
+              console.warn("Falling back to fetch for:", file.url, err);
+              const response = await fetch(file.url);
+              const blob = await response.blob();
+              boqFolder?.file(file.name, blob);
+            }
           }
         }
       }
@@ -215,9 +224,18 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
           const mandFolder = rootFolder?.folder(mand.type);
           for (const file of mand.files) {
             allUrls.push(file.url);
-            const response = await fetch(file.url);
-            const blob = await response.blob();
-            mandFolder?.file(file.name, blob);
+            try {
+              const filePath = file.url.split('/evidence/')[1];
+              if (!filePath) throw new Error("Invalid URL path");
+              const { data, error } = await supabase.storage.from('evidence').download(filePath);
+              if (error) throw error;
+              if (data) mandFolder?.file(file.name, data);
+            } catch (err) {
+              console.warn("Falling back to fetch for:", file.url, err);
+              const response = await fetch(file.url);
+              const blob = await response.blob();
+              mandFolder?.file(file.name, blob);
+            }
           }
         }
       }
