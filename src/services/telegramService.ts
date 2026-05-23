@@ -49,6 +49,8 @@ export async function sendTelegramMediaGroup(files: File[], caption: string) {
 
   const media = files.map((file, index) => {
     const isImage = file.type.startsWith('image/');
+    // Instead of using the generic caption passed by FileUploader, use formatting specifically for evidence
+    // This allows us to have the descriptive format (like Evidence Submitted) attached directly to the first image, eliminating the need for a separate text message
     return {
       type: isImage ? 'photo' : 'document',
       media: `attach://file${index}`,

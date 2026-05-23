@@ -114,12 +114,6 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
 
     await syncSubmissionToSupabase(id, subData);
     await fetchData();
-
-    // Send Telegram Notification
-    if (lop) {
-      const designator = lop.boq[boqIndex].designator;
-      await sendTelegramMessage(formatSubmissionNotification(lop.name, designator, profile.name));
-    }
   };
 
   const handleUploadMandatory = async (type: string, files: any[]) => {
@@ -480,7 +474,7 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
                             onUploadComplete={(files) => handleUploadMandatory(type.name, files)}
                             maxSizeMB={10}
                             multiple={true}
-                            telegramCaption={`Mandatory Re-upload: ${type.name}\nLOP: ${lop.name}\nMitra: ${profile.name}`}
+                            telegramCaption={formatSubmissionNotification(lop.name, `Mandatory: ${type.name}`, profile.name)}
                           />
                         </div>
                       )
@@ -500,7 +494,7 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
                     onUploadComplete={(files) => handleUploadMandatory(type.name, files)}
                     maxSizeMB={10}
                     multiple={true}
-                    telegramCaption={`Mandatory: ${type.name}\nLOP: ${lop.name}\nMitra: ${profile.name}`}
+                    telegramCaption={formatSubmissionNotification(lop.name, `Mandatory: ${type.name}`, profile.name)}
                   />
                 ) : (
                   <p className="text-xs text-slate-400 italic">No upload yet</p>
@@ -624,7 +618,7 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
                         handleUploadEvidence(reviewing.index, files);
                         setReviewing(null);
                       }}
-                      telegramCaption={`BOQ Evidence: ${lop.boq[reviewing.index].designator}\nLOP: ${lop.name}\nMitra: ${profile.name}`}
+                      telegramCaption={formatSubmissionNotification(lop.name, lop.boq[reviewing.index].designator, profile.name)}
                     />
                   </div>
                 ) : (
