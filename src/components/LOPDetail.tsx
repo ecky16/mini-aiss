@@ -305,6 +305,11 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
   const allApproved = lop.boq.every((_, i) => submissions.find(s => s.boqIndex === i)?.status === 'approved');
   const mandatoryDone = mandatoryTypes.filter(t => t.mandatory).every(t => mandatoryUploads.find(m => m.type === t.name && m.status === 'approved'));
 
+  const hasPendingOrRejected = submissions.some(s => s.status !== 'approved') || mandatoryUploads.some(m => m.status !== 'approved');
+  const hasAnyApproved = submissions.some(s => s.status === 'approved') || mandatoryUploads.some(m => m.status === 'approved');
+  
+  const canComplete = !hasPendingOrRejected && hasAnyApproved;
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -326,7 +331,7 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
         <div className="flex gap-2">
           {profile.role === 'admin' && (
             <>
-              {(allApproved && mandatoryDone) ? (
+              {canComplete ? (
                 <>
                   {lop.status !== 'completed' ? (
                     <button
@@ -419,7 +424,7 @@ export default function LOPDetail({ lopId, profile, onBack }: { lopId: string, p
       </div>
 
       {/* Fully Approved Banner */}
-      {allApproved && mandatoryDone && (
+      {canComplete && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-green-100 p-2 rounded-full">
